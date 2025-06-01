@@ -5,6 +5,7 @@ This projects runs using C++, CMake, and vcpkg.
 
 Using vcpkg, the following libraries were installed:
 - glfw3
+- glad
 
 ## Setup
 
@@ -14,8 +15,6 @@ Using vcpkg, the following libraries were installed:
 
 ### Build
 ```
-cd build
-cmake ..
-cd ..
+cmake --preset=default
 cmake --build build
 ```
