@@ -9,7 +9,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 
 # Add source files
-add_executable(app src/main.cpp)
+add_executable(app src/main.cpp src/shader.cpp)
 
 # Link libraries
 target_link_libraries(app glfw)
