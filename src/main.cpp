@@ -2,6 +2,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "shader.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 constexpr int WIDTH = 1600;
 constexpr int HEIGHT = 1200;
@@ -41,12 +44,43 @@ int main() {
     Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
 
     float vertices[] = {
-        -0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // Red vertex
-         0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // Green vertex  
-         0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // Blue vertex
+        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  // 0: back-bottom-left
+        0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,  // 1: back-bottom-right  
+        0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 1.0f,  // 2: back-top-right
+        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  // 3: back-top-left
+        -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f,  // 4: front-bottom-left
+        0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,  // 5: front-bottom-right
+        0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,  // 6: front-top-right
+        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f   // 7: front-top-left
     };
-    unsigned int indices[] = {  // note that we start from 0!
-        0, 1, 2,
+
+    // Replace your indices array with cube indices:
+    unsigned int indices[] = {
+        // Back face
+        0, 1, 2,    2, 3, 0,
+        // Front face  
+        4, 5, 6,    6, 7, 4,
+        // Left face
+        0, 4, 7,    7, 3, 0,
+        // Right face
+        1, 5, 6,    6, 2, 1,
+        // Bottom face
+        0, 1, 5,    5, 4, 0,
+        // Top face
+        3, 2, 6,    6, 7, 3
+    };
+
+    glm::vec3 cubePositions[] = {
+        glm::vec3( 0.0f,  0.0f,  0.0f), 
+        glm::vec3( 2.0f,  5.0f, -15.0f), 
+        glm::vec3(-1.5f, -2.2f, -2.5f),  
+        glm::vec3(-3.8f, -2.0f, -12.3f),  
+        glm::vec3( 2.4f, -0.4f, -3.5f),  
+        glm::vec3(-1.7f,  3.0f, -7.5f),  
+        glm::vec3( 1.3f, -2.0f, -2.5f),  
+        glm::vec3( 1.5f,  2.0f, -2.5f), 
+        glm::vec3( 1.5f,  0.2f, -1.5f), 
+        glm::vec3(-1.3f,  1.0f, -1.5f)  
     };
 
     unsigned int VAO;
@@ -68,18 +102,34 @@ int main() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
+    glm::mat4 view = glm::mat4(1.0f);
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
+    glm::mat4 projection;
+    projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+
+    glEnable(GL_DEPTH_TEST);
+
     while(!glfwWindowShouldClose(window)) {
         //input
         processInput(window);
 
         //rendering commands here
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         ourShader.use();
-
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+        ourShader.setMat4("view", view);
+        ourShader.setMat4("projection", projection);
+
+        for (unsigned int i = 0; i < 10; i++) { 
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(55.0f), glm::vec3(1.0f, 0.5f, 0.0f));
+            ourShader.setMat4("model", model);
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        }
 
         //check and call events and swap buffers
         glfwSwapBuffers(window);
