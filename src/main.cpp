@@ -7,21 +7,23 @@
 
 #include "shader.hpp"
 #include "camera.hpp"
+#include "geometry.hpp"
+#include "chunk.hpp"
 
-constexpr int WIDTH = 1600;
+constexpr int WIDTH = 1920;
 constexpr int HEIGHT = 1200;
 
 Camera camera{};
-
-static bool firstMouse = true;
-static float lastX = WIDTH / 2.0f;
-static float lastY = HEIGHT / 2.0f;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+    static bool firstMouse = true;
+    static float lastX = WIDTH / 2.0f;
+    static float lastY = HEIGHT / 2.0f;
+
     if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
@@ -45,7 +47,6 @@ void processInput(GLFWwindow *window, float deltaTime) {
         glfwSetWindowShouldClose(window, true);
     }
 
-    float cameraSpeed = 2.5f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -70,7 +71,6 @@ int main() {
     }
     glfwMakeContextCurrent(window);
 
-
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
@@ -80,39 +80,6 @@ int main() {
 
     Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
 
-    float vertices[] = {
-        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f, 
-        0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 1.0f, 
-        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f, 
-        -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f, 
-        0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,  
-        0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,  
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f  
-    };
-
-    unsigned int indices[] = {
-        0, 1, 2,    2, 3, 0,
-        4, 5, 6,    6, 7, 4,
-        0, 4, 7,    7, 3, 0,
-        1, 5, 6,    6, 2, 1,
-        0, 1, 5,    5, 4, 0,
-        3, 2, 6,    6, 7, 3
-    };
-
-    glm::vec3 cubePositions[] = {
-        glm::vec3( 0.0f,  0.0f,  0.0f), 
-        glm::vec3( 2.0f,  5.0f, -15.0f), 
-        glm::vec3(-1.5f, -2.2f, -2.5f),  
-        glm::vec3(-3.8f, -2.0f, -12.3f),  
-        glm::vec3( 2.4f, -0.4f, -3.5f),  
-        glm::vec3(-1.7f,  3.0f, -7.5f),  
-        glm::vec3( 1.3f, -2.0f, -2.5f),  
-        glm::vec3( 1.5f,  2.0f, -2.5f), 
-        glm::vec3( 1.5f,  0.2f, -1.5f), 
-        glm::vec3(-1.3f,  1.0f, -1.5f)  
-    };
-
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
@@ -120,7 +87,7 @@ int main() {
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
@@ -130,7 +97,7 @@ int main() {
     unsigned int EBO;
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
 
     glEnable(GL_DEPTH_TEST);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -138,6 +105,8 @@ int main() {
     glfwSetScrollCallback(window, scroll_callback);
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
+
+    Chunk chunk(0, 0);
 
     while(!glfwWindowShouldClose(window)) {
         //input
@@ -159,10 +128,9 @@ int main() {
         glm::mat4 view = camera.GetViewMatrix();
         ourShader.setMat4("view", view);
 
-        for (unsigned int i = 0; i < 10; i++) { 
+        for (auto& cubePosition : chunk.generateCubePositions()) { 
             glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            model = glm::rotate(model, (float)glfwGetTime() * glm::radians(55.0f), glm::vec3(1.0f, 0.5f, 0.0f));
+            model = glm::translate(model, cubePosition);
 
             ourShader.setMat4("model", model);
             glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
