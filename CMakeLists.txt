@@ -10,7 +10,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
 # Add source files
-add_executable(app src/main.cpp src/shader.cpp)
+add_executable(app src/main.cpp src/shader.cpp src/camera.cpp)
 
 # Link libraries
 target_link_libraries(app glfw)
