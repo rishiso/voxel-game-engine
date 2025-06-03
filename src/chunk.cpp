@@ -1,25 +1,71 @@
 #include "chunk.hpp"
 
+// Initialize static noise generator
+FastNoise::SmartNode<FastNoise::FractalFBm> Chunk::s_noiseGenerator = nullptr;
+
+void Chunk::initializeNoise() {
+    // Configure for Perlin noise
+    auto perlin = FastNoise::New<FastNoise::Perlin>();
+    
+    // Scale noise to make it terrain-like
+    auto fractal = FastNoise::New<FastNoise::FractalFBm>();
+    fractal->SetSource(perlin);
+    fractal->SetOctaveCount(5);  // More octaves = more detail
+    
+    // Set the final generator
+    s_noiseGenerator = fractal;
+}
+
 Chunk::Chunk(int chunkX, int chunkZ) 
-    : m_chunkX(chunkX), m_chunkZ(chunkZ), m_cubes(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, false)
-{
-    // Initialize with some basic terrain generation
-    // For now, just create a simple ground layer and some random blocks
+    : m_chunkX(chunkX), m_chunkZ(chunkZ), m_cubes(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, false) {
+    
+    // Initialize noise generator if not already initialized
+    if (!s_noiseGenerator) {
+        initializeNoise();
+    }
+    
+    // Generate terrain using Perlin noise
+    generateTerrain();
+}
+
+void Chunk::generateTerrain() {
+    // Clear existing blocks
+    std::fill(m_cubes.begin(), m_cubes.end(), false);
+    
+    // Generate new terrain
     for (int x = 0; x < CHUNK_WIDTH; x++) {
         for (int z = 0; z < CHUNK_DEPTH; z++) {
-            // Create ground layer (y = 0 to 10)
-            for (int y = 0; y < 10; y++) {
-                setCube(x, y, z, true);
-            }
+            // Get world coordinates for noise sampling
+            int worldX = m_chunkX * CHUNK_WIDTH + x;
+            int worldZ = m_chunkZ * CHUNK_DEPTH + z;
             
-            // Add some random blocks higher up (simple terrain variation)
-            if ((x + z + chunkX + chunkZ) % 3 == 0) {
-                for (int y = 10; y < 15; y++) {
-                    setCube(x, y, z, true);
-                }
+            // Get terrain height at this position
+            int height = getHeightAt(worldX, worldZ);
+            
+            // Ensure height is within chunk boundaries
+            height = std::min(height, CHUNK_HEIGHT - 1);
+            height = std::max(height, 0);
+            
+            // Set all blocks from bottom to height as solid
+            for (int y = 0; y <= height; y++) {
+                setCube(x, y, z, true);
             }
         }
     }
+}
+
+int Chunk::getHeightAt(int worldX, int worldZ) const {
+    // Sample 2D noise at the world coordinates
+    float noiseValue = s_noiseGenerator->GenSingle2D(worldX * 0.01f, worldZ * 0.01f, 0);
+    
+    // Convert from [-1,1] to [0,1] range
+    noiseValue = (noiseValue + 1.0f) * 0.5f;
+    
+    // Scale to desired height range
+    int baseHeight = 30;  // Base height of the terrain
+    int heightVariation = 40;  // Maximum height variation
+    
+    return baseHeight + static_cast<int>(noiseValue * heightVariation);
 }
 
 std::vector<glm::vec3> Chunk::generateCubePositions() const {

@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <glm/glm.hpp>
+#include <FastNoise/FastNoise.h>
+#include <memory>
 
 class Chunk
 {
@@ -26,6 +28,12 @@ public:
     // Convert local coordinates to world coordinates
     glm::vec3 localToWorld(int x, int y, int z) const;
     
+    // Generate terrain using Perlin noise
+    void generateTerrain();
+    
+    // Static method to initialize noise generator
+    static void initializeNoise();
+    
 private:
     // Chunk position in chunk coordinates (not world coordinates)
     int m_chunkX;
@@ -40,4 +48,10 @@ private:
     
     // Check if coordinates are valid
     bool isValidCoordinate(int x, int y, int z) const;
+    
+    // Get height at a specific x,z coordinate using Perlin noise
+    int getHeightAt(int worldX, int worldZ) const;
+    
+    // Static FastNoise2 generator for all chunks
+    static FastNoise::SmartNode<FastNoise::FractalFBm> s_noiseGenerator;
 }; 

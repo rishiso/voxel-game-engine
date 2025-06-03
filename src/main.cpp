@@ -106,7 +106,21 @@ int main() {
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
 
-    Chunk chunk(0, 0);
+    // Initialize the noise generator once for all chunks
+    Chunk::initializeNoise();
+
+    // Create a 3x3 grid of chunks to demonstrate terrain continuity
+    const int GRID_SIZE = 3;
+    std::vector<Chunk> chunks;
+    
+    for (int x = 0; x <= GRID_SIZE; x++) {
+        for (int z = 0; z <= GRID_SIZE; z++) {
+            chunks.emplace_back(x, z);
+        }
+    }
+
+    // Set camera to a good position to view the terrain
+    camera.Position = glm::vec3(Chunk::CHUNK_WIDTH/2, 80.0f, Chunk::CHUNK_DEPTH/2);
 
     while(!glfwWindowShouldClose(window)) {
         //input
@@ -128,12 +142,15 @@ int main() {
         glm::mat4 view = camera.GetViewMatrix();
         ourShader.setMat4("view", view);
 
-        for (auto& cubePosition : chunk.generateCubePositions()) { 
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePosition);
+        // Render all chunks
+        for (const auto& chunk : chunks) {
+            for (auto& cubePosition : chunk.generateCubePositions()) { 
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, cubePosition);
 
-            ourShader.setMat4("model", model);
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                ourShader.setMat4("model", model);
+                glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+            }
         }
 
         //check and call events and swap buffers
