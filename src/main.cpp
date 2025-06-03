@@ -18,6 +18,7 @@ extern "C" {
 
 constexpr int WIDTH = 1920;
 constexpr int HEIGHT = 1200;
+constexpr int GRID_SIZE = 16;
 
 Camera camera{};
 
@@ -63,7 +64,14 @@ void processInput(GLFWwindow *window, float deltaTime) {
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-int main() {    
+void setupOpenGL() {
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CW);
+}
+
+GLFWwindow* initializeWindow() {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -73,26 +81,42 @@ int main() {
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
-        return -1;
+        return nullptr;
     }
     glfwMakeContextCurrent(window);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
-        return -1;
+        return nullptr;
     }
+    
     glViewport(0, 0, WIDTH, HEIGHT);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    
+    return window;
+}
 
-    Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
+void setupInputCallbacks(GLFWwindow* window) {
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+}
 
+struct RenderBuffers {
     unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-
     unsigned int VBO;
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    unsigned int VBOinstance;
+    unsigned int EBO;
+};
+
+RenderBuffers setupRenderBuffers() {
+    RenderBuffers buffers{};
+    
+    glGenVertexArrays(1, &buffers.VAO);
+    glBindVertexArray(buffers.VAO);
+
+    glGenBuffers(1, &buffers.VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers.VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
@@ -100,9 +124,8 @@ int main() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    unsigned int VBOinstance;
-    glGenBuffers(1, &VBOinstance);
-    glBindBuffer(GL_ARRAY_BUFFER, VBOinstance);
+    glGenBuffers(1, &buffers.VBOinstance);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
 
     for (unsigned int i = 0; i < 4; i++) {
         glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
@@ -110,38 +133,24 @@ int main() {
         glVertexAttribDivisor(2 + i, 1);
     }
 
-    unsigned int EBO;
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glGenBuffers(1, &buffers.EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
     
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CW);
+    return buffers;
+}
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-    
-    float deltaTime = 0.0f;
-    float lastFrame = 0.0f;
-    
-    float fpsUpdateTime = 0.0f;
-    int frameCount = 0;
-    float fps = 0.0f;
-
-    Chunk::initializeNoise();
-
-    const int GRID_SIZE = 12;
+std::vector<Chunk> generateChunks() {
     std::vector<Chunk> chunks;
-    
     for (int x = 0; x < GRID_SIZE; x++) {
         for (int z = 0; z < GRID_SIZE; z++) {
             chunks.emplace_back(x, z);
         }
     }
+    return chunks;
+}
 
+std::vector<glm::mat4> generateModelMatrices(const std::vector<Chunk>& chunks) {
     std::vector<glm::mat4> modelMatrices;
     for (const auto& chunk : chunks) {
         for (auto& cubePosition : chunk.generateCubePositions()) { 
@@ -149,48 +158,75 @@ int main() {
             modelMatrices.push_back(glm::translate(model, cubePosition));
         }
     }
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
+    return modelMatrices;
+}
 
-
-    // Set camera to a good position to view the terrain
-    camera.Position = glm::vec3(Chunk::CHUNK_WIDTH/2, 80.0f, Chunk::CHUNK_DEPTH/2);
-
-    while(!glfwWindowShouldClose(window)) {
-        //input
+struct FrameTimer {
+    float deltaTime = 0.0f;
+    float lastFrame = 0.0f;
+    float fpsUpdateTime = 0.0f;
+    int frameCount = 0;
+    float fps = 0.0f;
+    
+    void update() {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         
-        // FPS calculation
         frameCount++;
         fpsUpdateTime += deltaTime;
         
-        // Update FPS every second
         if (fpsUpdateTime >= 1.0f) {
             fps = frameCount / fpsUpdateTime;
             std::cout << "FPS: " << fps << std::endl;
             frameCount = 0;
             fpsUpdateTime = 0.0f;
         }
-        
-        processInput(window, deltaTime);
+    }
+};
 
-        //rendering commands here
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void render(Shader& shader, const std::vector<glm::mat4>& modelMatrices) {
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        ourShader.use();
-        
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
-        ourShader.setMat4("projection", projection);
-        
-        glm::mat4 view = camera.GetViewMatrix();
-        ourShader.setMat4("view", view);
+    shader.use();
+    
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
+    shader.setMat4("projection", projection);
+    
+    glm::mat4 view = camera.GetViewMatrix();
+    shader.setMat4("view", view);
 
-        // Render all chunks
-        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, modelMatrices.size());
+    glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, modelMatrices.size());
+}
 
-        //check and call events and swap buffers
+int main() {    
+    GLFWwindow* window = initializeWindow();
+    if (!window) {
+        return -1;
+    }
+
+    Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
+    RenderBuffers buffers = setupRenderBuffers();
+    setupOpenGL();
+    setupInputCallbacks(window);
+    
+    FrameTimer timer;
+    Chunk::initializeNoise();
+    
+    std::vector<Chunk> chunks = generateChunks();
+    std::vector<glm::mat4> modelMatrices = generateModelMatrices(chunks);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
+
+    camera.Position = glm::vec3(Chunk::CHUNK_WIDTH/2, 80.0f, Chunk::CHUNK_DEPTH/2);
+
+    while(!glfwWindowShouldClose(window)) {
+        timer.update();
+        processInput(window, timer.deltaTime);
+        render(ourShader, modelMatrices);
+
         glfwSwapBuffers(window);
         glfwPollEvents();    
     }
