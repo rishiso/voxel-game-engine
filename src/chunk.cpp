@@ -22,10 +22,9 @@ Chunk::Chunk(int chunkX, int chunkZ)
     }
 }
 
-std::vector<glm::vec3> Chunk::generateCubePositions() const
-{
+std::vector<glm::vec3> Chunk::generateCubePositions() const {
     std::vector<glm::vec3> positions;
-    positions.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH); // Reserve maximum possible size
+    positions.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH);
     
     for (int x = 0; x < CHUNK_WIDTH; x++) {
         for (int y = 0; y < CHUNK_HEIGHT; y++) {
@@ -40,8 +39,7 @@ std::vector<glm::vec3> Chunk::generateCubePositions() const
     return positions;
 }
 
-bool Chunk::getCube(int x, int y, int z) const
-{
+bool Chunk::getCube(int x, int y, int z) const {
     if (!isValidCoordinate(x, y, z)) {
         return false;
     }
@@ -49,8 +47,7 @@ bool Chunk::getCube(int x, int y, int z) const
     return m_cubes[getIndex(x, y, z)];
 }
 
-void Chunk::setCube(int x, int y, int z, bool exists)
-{
+void Chunk::setCube(int x, int y, int z, bool exists) {
     if (!isValidCoordinate(x, y, z)) {
         return;
     }
@@ -58,8 +55,7 @@ void Chunk::setCube(int x, int y, int z, bool exists)
     m_cubes[getIndex(x, y, z)] = exists;
 }
 
-glm::vec3 Chunk::localToWorld(int x, int y, int z) const
-{
+glm::vec3 Chunk::localToWorld(int x, int y, int z) const {
     // Convert local chunk coordinates to world coordinates
     float worldX = m_chunkX * CHUNK_WIDTH + x;
     float worldY = y; // Y is the same (height)
@@ -68,16 +64,14 @@ glm::vec3 Chunk::localToWorld(int x, int y, int z) const
     return glm::vec3(worldX, worldY, worldZ);
 }
 
-int Chunk::getIndex(int x, int y, int z) const
-{
+int Chunk::getIndex(int x, int y, int z) const {
     // Convert 3D coordinates to 1D index
     // Layout: x + z * CHUNK_WIDTH + y * CHUNK_WIDTH * CHUNK_DEPTH
     return x + z * CHUNK_WIDTH + y * CHUNK_WIDTH * CHUNK_DEPTH;
 }
 
-bool Chunk::isValidCoordinate(int x, int y, int z) const
-{
+bool Chunk::isValidCoordinate(int x, int y, int z) const {
     return x >= 0 && x < CHUNK_WIDTH &&
            y >= 0 && y < CHUNK_HEIGHT &&
            z >= 0 && z < CHUNK_DEPTH;
-} 
+}

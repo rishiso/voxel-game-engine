@@ -6,12 +6,10 @@
 class Chunk
 {
 public:
-    // Chunk dimensions
     static constexpr int CHUNK_WIDTH = 16;
     static constexpr int CHUNK_DEPTH = 16;
     static constexpr int CHUNK_HEIGHT = 256;
     
-    // Constructor
     Chunk(int chunkX = 0, int chunkZ = 0);
     
     // Generate all cube positions within this chunk
