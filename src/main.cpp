@@ -10,6 +10,12 @@
 #include "geometry.hpp"
 #include "chunk.hpp"
 
+// Force NVIDIA GPU usage on laptops with dual graphics
+extern "C" {
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 constexpr int WIDTH = 1920;
 constexpr int HEIGHT = 1200;
 
@@ -108,19 +114,26 @@ int main() {
     glGenBuffers(1, &EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
-
+    
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CW);
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
+    
     float deltaTime = 0.0f;
     float lastFrame = 0.0f;
+    
+    float fpsUpdateTime = 0.0f;
+    int frameCount = 0;
+    float fps = 0.0f;
 
-    // Initialize the noise generator once for all chunks
     Chunk::initializeNoise();
 
-    // Create a 3x3 grid of chunks to demonstrate terrain continuity
-    const int GRID_SIZE = 4;
+    const int GRID_SIZE = 12;
     std::vector<Chunk> chunks;
     
     for (int x = 0; x < GRID_SIZE; x++) {
@@ -128,6 +141,16 @@ int main() {
             chunks.emplace_back(x, z);
         }
     }
+
+    std::vector<glm::mat4> modelMatrices;
+    for (const auto& chunk : chunks) {
+        for (auto& cubePosition : chunk.generateCubePositions()) { 
+            glm::mat4 model = glm::mat4(1.0f);
+            modelMatrices.push_back(glm::translate(model, cubePosition));
+        }
+    }
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
+
 
     // Set camera to a good position to view the terrain
     camera.Position = glm::vec3(Chunk::CHUNK_WIDTH/2, 80.0f, Chunk::CHUNK_DEPTH/2);
@@ -137,6 +160,19 @@ int main() {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
+        
+        // FPS calculation
+        frameCount++;
+        fpsUpdateTime += deltaTime;
+        
+        // Update FPS every second
+        if (fpsUpdateTime >= 1.0f) {
+            fps = frameCount / fpsUpdateTime;
+            std::cout << "FPS: " << fps << std::endl;
+            frameCount = 0;
+            fpsUpdateTime = 0.0f;
+        }
+        
         processInput(window, deltaTime);
 
         //rendering commands here
@@ -144,25 +180,14 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         ourShader.use();
-        glBindVertexArray(VAO);
         
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
         ourShader.setMat4("projection", projection);
         
         glm::mat4 view = camera.GetViewMatrix();
         ourShader.setMat4("view", view);
 
         // Render all chunks
-        std::vector<glm::mat4> modelMatrices;
-        for (const auto& chunk : chunks) {
-            for (auto& cubePosition : chunk.generateCubePositions()) { 
-                glm::mat4 model = glm::mat4(1.0f);
-                modelMatrices.push_back(glm::translate(model, cubePosition));
-            }
-        }
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBOinstance);
-        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
         glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, modelMatrices.size());
 
         //check and call events and swap buffers
