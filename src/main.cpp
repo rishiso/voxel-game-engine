@@ -4,11 +4,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <memory>
 
 #include "shader.hpp"
 #include "camera.hpp"
 #include "geometry.hpp"
 #include "chunk.hpp"
+#include "chunk_manager.hpp"
 
 // Force NVIDIA GPU usage on laptops with dual graphics
 extern "C" {
@@ -18,9 +20,9 @@ extern "C" {
 
 constexpr int WIDTH = 1920;
 constexpr int HEIGHT = 1200;
-constexpr int GRID_SIZE = 16;
 
 Camera camera{};
+ChunkManager chunkManager{};
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -69,6 +71,11 @@ void setupOpenGL() {
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CW);
+}
+
+void globalToChunk(int worldX, int worldZ, int& chunkX, int& chunkZ) {
+    chunkX = worldX / Chunk::CHUNK_WIDTH;
+    chunkZ = worldZ / Chunk::CHUNK_DEPTH;
 }
 
 GLFWwindow* initializeWindow() {
@@ -140,20 +147,10 @@ RenderBuffers setupRenderBuffers() {
     return buffers;
 }
 
-std::vector<Chunk> generateChunks() {
-    std::vector<Chunk> chunks;
-    for (int x = 0; x < GRID_SIZE; x++) {
-        for (int z = 0; z < GRID_SIZE; z++) {
-            chunks.emplace_back(x, z);
-        }
-    }
-    return chunks;
-}
-
-std::vector<glm::mat4> generateModelMatrices(const std::vector<Chunk>& chunks) {
+std::vector<glm::mat4> generateModelMatrices(const std::vector<std::shared_ptr<Chunk>>& chunks) {
     std::vector<glm::mat4> modelMatrices;
     for (const auto& chunk : chunks) {
-        for (auto& cubePosition : chunk.generateCubePositions()) { 
+        for (auto& cubePosition : chunk->generateCubePositions()) { 
             glm::mat4 model = glm::mat4(1.0f);
             modelMatrices.push_back(glm::translate(model, cubePosition));
         }
@@ -213,18 +210,25 @@ int main() {
     
     FrameTimer timer;
     Chunk::initializeNoise();
-    
-    std::vector<Chunk> chunks = generateChunks();
-    std::vector<glm::mat4> modelMatrices = generateModelMatrices(chunks);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_STATIC_DRAW);
 
     camera.Position = glm::vec3(Chunk::CHUNK_WIDTH/2, 80.0f, Chunk::CHUNK_DEPTH/2);
+
+    std::vector<glm::mat4> modelMatrices = generateModelMatrices(chunkManager.getChunks());
+    glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
 
     while(!glfwWindowShouldClose(window)) {
         timer.update();
         processInput(window, timer.deltaTime);
+        
+        int chunkX, chunkZ;
+        globalToChunk(camera.Position.x, camera.Position.z, chunkX, chunkZ);
+        if (chunkManager.updateChunks(chunkX, chunkZ)) {
+            modelMatrices = generateModelMatrices(chunkManager.getChunks());
+            glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
+            glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+        }
+
         render(ourShader, modelMatrices);
 
         glfwSwapBuffers(window);

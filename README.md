@@ -1,11 +1,7 @@
 # Voxel Game Engine
 
 ## Prerequisites
-This projects runs using C++, CMake, and vcpkg. 
-
-Using vcpkg, the following libraries were installed:
-- glfw3
-- glad
+This projects runs using C++, CMake, and vcpkg.
 
 ## Setup
 

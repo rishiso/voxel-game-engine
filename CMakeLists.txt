@@ -18,7 +18,7 @@ find_package(glad CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
 # Add source files
-add_executable(app src/main.cpp src/shader.cpp src/camera.cpp src/chunk.cpp)
+add_executable(app src/main.cpp src/shader.cpp src/camera.cpp src/chunk.cpp src/chunk_manager.cpp)
 
 # Link libraries
 target_link_libraries(app PRIVATE glfw)
