@@ -16,6 +16,10 @@ void Chunk::initializeNoise() {
     s_noiseGenerator = fractal;
 }
 
+void Chunk::cleanupNoise() {
+    s_noiseGenerator = nullptr;
+}
+
 Chunk::Chunk(int chunkX, int chunkZ) 
     : m_chunkX(chunkX), m_chunkZ(chunkZ), m_cubes(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH, false) {
     
@@ -69,20 +73,25 @@ int Chunk::getHeightAt(int worldX, int worldZ) const {
 }
 
 std::vector<glm::vec3> Chunk::generateCubePositions() const {
-    std::vector<glm::vec3> positions;
-    positions.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH);
+    if (!m_positionsDirty) {
+        return m_cubePositions;
+    }
+
+    m_cubePositions.clear();
+    m_cubePositions.reserve(CHUNK_WIDTH * CHUNK_HEIGHT * CHUNK_DEPTH);
     
     for (int x = 0; x < CHUNK_WIDTH; x++) {
         for (int y = 0; y < CHUNK_HEIGHT; y++) {
             for (int z = 0; z < CHUNK_DEPTH; z++) {
                 if (getCube(x, y, z)) {
-                    positions.push_back(localToWorld(x, y, z));
+                    m_cubePositions.push_back(localToWorld(x, y, z));
                 }
             }
         }
     }
     
-    return positions;
+    m_positionsDirty = false;
+    return m_cubePositions;
 }
 
 bool Chunk::getCube(int x, int y, int z) const {
@@ -99,6 +108,7 @@ void Chunk::setCube(int x, int y, int z, bool exists) {
     }
     
     m_cubes[getIndex(x, y, z)] = exists;
+    m_positionsDirty = true;
 }
 
 glm::vec3 Chunk::localToWorld(int x, int y, int z) const {

@@ -33,11 +33,14 @@ public:
     
     // Static method to initialize noise generator
     static void initializeNoise();
+    static void cleanupNoise();
     
 private:
     // Chunk position in chunk coordinates (not world coordinates)
     int m_chunkX;
     int m_chunkZ;
+    mutable std::vector<glm::vec3> m_cubePositions{};
+    mutable bool m_positionsDirty = false;
     
     // 3D array to store which cubes exist (true = cube exists, false = air)
     // Using a 1D vector for better memory layout

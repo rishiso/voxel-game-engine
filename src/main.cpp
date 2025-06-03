@@ -88,11 +88,21 @@ int main() {
     glGenBuffers(1, &VBO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    unsigned int VBOinstance;
+    glGenBuffers(1, &VBOinstance);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOinstance);
+
+    for (unsigned int i = 0; i < 4; i++) {
+        glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void*)(i * sizeof(glm::vec4)));
+        glEnableVertexAttribArray(2 + i);
+        glVertexAttribDivisor(2 + i, 1);
+    }
 
     unsigned int EBO;
     glGenBuffers(1, &EBO);
@@ -110,11 +120,11 @@ int main() {
     Chunk::initializeNoise();
 
     // Create a 3x3 grid of chunks to demonstrate terrain continuity
-    const int GRID_SIZE = 3;
+    const int GRID_SIZE = 4;
     std::vector<Chunk> chunks;
     
-    for (int x = 0; x <= GRID_SIZE; x++) {
-        for (int z = 0; z <= GRID_SIZE; z++) {
+    for (int x = 0; x < GRID_SIZE; x++) {
+        for (int z = 0; z < GRID_SIZE; z++) {
             chunks.emplace_back(x, z);
         }
     }
@@ -143,21 +153,24 @@ int main() {
         ourShader.setMat4("view", view);
 
         // Render all chunks
+        std::vector<glm::mat4> modelMatrices;
         for (const auto& chunk : chunks) {
             for (auto& cubePosition : chunk.generateCubePositions()) { 
                 glm::mat4 model = glm::mat4(1.0f);
-                model = glm::translate(model, cubePosition);
-
-                ourShader.setMat4("model", model);
-                glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+                modelMatrices.push_back(glm::translate(model, cubePosition));
             }
         }
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBOinstance);
+        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, modelMatrices.size());
 
         //check and call events and swap buffers
         glfwSwapBuffers(window);
         glfwPollEvents();    
     }
 
+    Chunk::cleanupNoise();
     glfwTerminate();
     return 0;
 }
