@@ -147,7 +147,7 @@ RenderBuffers setupRenderBuffers() {
     return buffers;
 }
 
-std::vector<glm::mat4> generateModelMatrices(const std::vector<std::shared_ptr<Chunk>>& chunks) {
+std::vector<glm::mat4> generateModelMatrices(const std::vector<Chunk*>& chunks) {
     std::vector<glm::mat4> modelMatrices;
     for (const auto& chunk : chunks) {
         for (auto& cubePosition : chunk->generateCubePositions()) { 

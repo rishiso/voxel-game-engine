@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
+#include <future>
 #include "chunk.hpp"
 
 struct PairHash {
@@ -12,12 +13,12 @@ struct PairHash {
 
 class ChunkManager {
 private:
-    std::unordered_map<std::pair<int, int>, std::shared_ptr<Chunk>, PairHash> chunks;
+    std::unordered_map<std::pair<int, int>, std::unique_ptr<Chunk>, PairHash> chunks;
 
 public:
     static constexpr int CHUNK_SIZE = 12;
 
-    std::vector<std::shared_ptr<Chunk>> getChunks() const;
+    std::vector<Chunk*> getChunks() const;
     bool updateChunks(int x, int z);
     std::unordered_set<std::pair<int, int>, PairHash> getDesiredChunks(int x, int z) const;
 };
