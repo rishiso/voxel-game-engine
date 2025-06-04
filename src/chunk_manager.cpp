@@ -12,32 +12,23 @@ bool ChunkManager::updateChunks(int x, int z) {
     bool dirty{false};
     std::unordered_set<std::pair<int, int>, PairHash> desiredChunks = getDesiredChunks(x, z);
 
-    std::vector<std::future<void>> futures;
     std::vector<std::pair<int, int>> newChunks;
 
-    // First pass: create chunks and collect new ones
+    // Create chunks and queue generation tasks
     for (const auto& pos : desiredChunks) {
         if (!chunks.contains(pos)) {
             chunks[pos] = std::make_unique<Chunk>(pos.first, pos.second);
-            newChunks.push_back(pos);
+            generationTasks[pos] = std::async(std::launch::async, [this, pos]() {
+                chunks[pos]->generateTerrain();
+            });
             dirty = true;
         }
     }
-    
-    // Second pass: launch parallel terrain generation on separate threads
-    for (const auto& pos : newChunks) {
-        futures.push_back(std::async(std::launch::async, [this, pos]() {
-            chunks[pos]->generateTerrain();
-        }));
-    }
-    
-    // Wait for all threads to complete
-    for (auto& future : futures) {
-        future.wait();
-    }
 
+    // Erase obsolete chunks
     for (auto it = chunks.begin(); it != chunks.end();) {
         if (!desiredChunks.contains(it->first)) {
+            generationTasks.erase(it->first);
             it = chunks.erase(it);
             dirty = true;
         } else {
@@ -56,4 +47,23 @@ std::unordered_set<std::pair<int, int>, PairHash> ChunkManager::getDesiredChunks
         }
     }
     return positions;
+}
+
+std::vector<std::pair<int,int>> ChunkManager::pollGeneratedChunks() {
+    std::vector<std::pair<int,int>> ready;
+    for (auto it = generationTasks.begin(); it != generationTasks.end();) {
+        if (it->second.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+            ready.push_back(it->first);
+            it = generationTasks.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return ready;
+}
+
+Chunk* ChunkManager::getChunk(int x, int z) const {
+    auto key = std::make_pair(x, z);
+    auto it = chunks.find(key);
+    return (it != chunks.end()) ? it->second.get() : nullptr;
 }

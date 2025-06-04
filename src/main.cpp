@@ -223,7 +223,10 @@ int main() {
         
         int chunkX, chunkZ;
         globalToChunk(camera.Position.x, camera.Position.z, chunkX, chunkZ);
-        if (chunkManager.updateChunks(chunkX, chunkZ)) {
+        chunkManager.updateChunks(chunkX, chunkZ);
+        auto completed = chunkManager.pollGeneratedChunks();
+        
+        if (!completed.empty()) {
             std::vector<glm::mat4> newMatrices = generateModelMatrices(chunkManager.getChunks());
             glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
             glBufferData(GL_ARRAY_BUFFER, newMatrices.size() * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);

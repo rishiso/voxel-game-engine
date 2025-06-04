@@ -8,8 +8,8 @@
 class Chunk
 {
 public:
-    static constexpr int CHUNK_WIDTH = 16;
-    static constexpr int CHUNK_DEPTH = 16;
+    static constexpr int CHUNK_WIDTH = 32;
+    static constexpr int CHUNK_DEPTH = 32;
     static constexpr int CHUNK_HEIGHT = 256;
     
     Chunk(int chunkX = 0, int chunkZ = 0);
