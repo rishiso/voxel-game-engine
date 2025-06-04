@@ -224,9 +224,11 @@ int main() {
         int chunkX, chunkZ;
         globalToChunk(camera.Position.x, camera.Position.z, chunkX, chunkZ);
         if (chunkManager.updateChunks(chunkX, chunkZ)) {
-            modelMatrices = generateModelMatrices(chunkManager.getChunks());
+            std::vector<glm::mat4> newMatrices = generateModelMatrices(chunkManager.getChunks());
             glBindBuffer(GL_ARRAY_BUFFER, buffers.VBOinstance);
-            glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, newMatrices.size() * sizeof(glm::mat4), nullptr, GL_DYNAMIC_DRAW);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, newMatrices.size() * sizeof(glm::mat4), newMatrices.data());
+            modelMatrices.swap(newMatrices);
         }
 
         render(ourShader, modelMatrices);
